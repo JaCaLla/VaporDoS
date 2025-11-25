@@ -1,91 +1,38 @@
-# ================================
-# Build image
-# ================================
-FROM swift:6.1-noble AS build
+# Phase 1: build
+FROM swift:5.10-jammy AS build
 
-# Install OS updates
-RUN export DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true \
-    && apt-get -q update \
-    && apt-get -q dist-upgrade -y \
-    && apt-get install -y libjemalloc-dev
-
-# Set up a build area
-WORKDIR /build
-
-# First just resolve dependencies.
-# This creates a cached layer that can be reused
-# as long as your Package.swift/Package.resolved
-# files do not change.
-COPY ./Package.* ./
-RUN swift package resolve \
-        $([ -f ./Package.resolved ] && echo "--force-resolved-versions" || true)
-
-# Copy entire repo into container
-COPY . .
-
-RUN mkdir /staging
-
-# Build the application, with optimizations, with static linking, and using jemalloc
-# N.B.: The static version of jemalloc is incompatible with the static Swift runtime.
-RUN --mount=type=cache,target=/build/.build \
-    swift build -c release \
-        --product VaporDoS \
-        --static-swift-stdlib \
-        -Xlinker -ljemalloc && \
-    # Copy main executable to staging area
-    cp "$(swift build -c release --show-bin-path)/VaporDoS" /staging && \
-    # Copy resources bundled by SPM to staging area
-    find -L "$(swift build -c release --show-bin-path)" -regex '.*\.resources$' -exec cp -Ra {} /staging \;
-
-
-# Switch to the staging area
-WORKDIR /staging
-
-# Copy static swift backtracer binary to staging area
-RUN cp "/usr/libexec/swift/linux/swift-backtrace-static" ./
-
-# Copy any resources from the public directory and views directory if the directories exist
-# Ensure that by default, neither the directory nor any of its contents are writable.
-RUN [ -d /build/Public ] && { mv /build/Public ./Public && chmod -R a-w ./Public; } || true
-RUN [ -d /build/Resources ] && { mv /build/Resources ./Resources && chmod -R a-w ./Resources; } || true
-
-# ================================
-# Run image
-# ================================
-FROM ubuntu:noble
-
-# Make sure all system packages are up to date, and install only essential packages.
-RUN export DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true \
-    && apt-get -q update \
-    && apt-get -q dist-upgrade -y \
-    && apt-get -q install -y \
-      libjemalloc2 \
-      ca-certificates \
-      tzdata \
-# If your app or its dependencies import FoundationNetworking, also install `libcurl4`.
-      # libcurl4 \
-# If your app or its dependencies import FoundationXML, also install `libxml2`.
-      # libxml2 \
-    && rm -r /var/lib/apt/lists/*
-
-# Create a vapor user and group with /app as its home directory
-RUN useradd --user-group --create-home --system --skel /dev/null --home-dir /app vapor
-
-# Switch to the new home directory
 WORKDIR /app
 
-# Copy built executable and any staged resources from builder
-COPY --from=build --chown=vapor:vapor /staging /app
+# Copy Package.swift and Source folder
+COPY Package.swift ./
+COPY Sources ./Sources
 
-# Provide configuration needed by the built-in crash reporter and some sensible default behaviors.
-ENV SWIFT_BACKTRACE=enable=yes,sanitize=yes,threads=all,images=all,interactive=no,swift-backtrace=./swift-backtrace-static
+# (Optional) resolve dependencies before, for cache
+RUN swift package resolve
 
-# Ensure all further commands run as the vapor user
-USER vapor:vapor
+# Compile in release mode
+RUN swift build -c release --static-swift-stdlib
 
-# Let Docker bind to port 8080
+# Phase 2: runtime
+FROM ubuntu:22.04 AS run
+
+# Minimal runtime dependencies for binary in Swift
+RUN apt-get update && \
+    apt-get install -y \
+    libbsd0 \
+    libcurl4 \
+    libxml2 \
+    libz3-4 \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /run
+
+COPY --from=build /app/.build/release/Run ./
+
 EXPOSE 8080
 
-# Start the Vapor service when the image is run, default to listening on 8080 in production environment
-ENTRYPOINT ["./VaporDoS"]
-CMD ["serve", "--env", "production", "--hostname", "0.0.0.0", "--port", "8080"]
+# In order vapor listens inside Docker
+ENV PORT=8080
+ENV HOSTNAME=0.0.0.0
+
+CMD ["./Run"]
