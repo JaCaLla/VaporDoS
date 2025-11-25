@@ -1,27 +1,18 @@
 # VaporDoS
 
-💧 A project built with the Vapor web framework.
+Sample app that shows how implement an DoS (Denial of Service) defense for a service implemented with 💧 Vapor. This is the basecode for following post [Stopping DoS Attacks: Vapor + Redis](https://javios.eu/vapor/stopping-dos-attacks-vapor-redis//)
 
-## Getting Started
+## Review
+<img src="media/review.jpg" alt="Console" width="900">
 
-To build the project using the Swift Package Manager, run the following command in the terminal from the root of the project:
-```bash
-swift build
-```
 
-To run the project and start the server, use the following command:
-```bash
-swift run
-```
+## Requirements
 
-To execute tests, use the following command:
-```bash
-swift test
-```
+- **Xcode 15.0 or later**
+- **iOS 16.0 or later**
 
-### See more
+## 🔖 License
 
-- [Vapor Website](https://vapor.codes)
-- [Vapor Documentation](https://docs.vapor.codes)
-- [Vapor GitHub](https://github.com/vapor)
-- [Vapor Community](https://github.com/vapor-community)
+This project is licensed under the MIT License.  
+See the [LICENSE](./LICENSE) file for details.
+
