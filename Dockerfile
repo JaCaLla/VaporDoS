@@ -34,5 +34,7 @@ EXPOSE 8080
 # In order vapor listens inside Docker
 ENV PORT=8080
 ENV HOSTNAME=0.0.0.0
+ENV REDIS_HOST=redis
+ENV REDIS_PORT=6379
 
 CMD ["./Run"]

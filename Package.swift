@@ -6,14 +6,19 @@ let package = Package(
     platforms: [
         .macOS(.v13)
     ],
+    products: [
+        .executable(name: "Run", targets: ["Run"])
+    ],
     dependencies: [
-        .package(url: "https://github.com/vapor/vapor.git", from: "4.92.0")
+        .package(url: "https://github.com/vapor/vapor.git", from: "4.92.0"),
+        .package(url: "https://github.com/vapor/redis.git", from: "4.0.0")
     ],
     targets: [
         .target(
             name: "App",
             dependencies: [
-                .product(name: "Vapor", package: "vapor")
+                .product(name: "Vapor", package: "vapor"),
+                .product(name: "Redis", package: "redis")
             ],
             path: "Sources/App"
         ),
